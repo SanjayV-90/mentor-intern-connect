@@ -13,7 +13,7 @@ import {
 
 export const InternProfilePage: React.FC = () => {
   const queryClient = useQueryClient();
-  const { updateUserSession } = useAuth();
+  const { user, updateUserSession } = useAuth();
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -33,7 +33,7 @@ export const InternProfilePage: React.FC = () => {
   });
 
   const { data: profile, isLoading } = useQuery({
-    queryKey: ['myProfile'],
+    queryKey: ['myProfile', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/profile/me');
       const d = res.data.data;

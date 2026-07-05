@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { Flame, UploadCloud, CheckCircle2, Award, Image as ImageIcon } from 'luc
 
 export const InternDuolingoPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export const InternDuolingoPage: React.FC = () => {
   });
 
   const { data: duolingoHistory = [], isLoading } = useQuery({
-    queryKey: ['myDuolingo'],
+    queryKey: ['myDuolingo', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/duolingo');
       return res.data.data;
@@ -39,7 +41,7 @@ export const InternDuolingoPage: React.FC = () => {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myDuolingo'] });
+      queryClient.invalidateQueries({ queryKey: ['myDuolingo', user?.userId] });
       queryClient.invalidateQueries({ queryKey: ['adminDashboard'] });
       setMsg('Daily Duolingo streak verified and recorded successfully!');
       setTimeout(() => setMsg(null), 4000);

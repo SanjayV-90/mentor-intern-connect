@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { CalendarDays, Send, Trash2, CheckCircle2, AlertCircle, Clock, FileText 
 
 export const InternLeavesPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [leaveType, setLeaveType] = useState('SICK');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -16,7 +18,7 @@ export const InternLeavesPage: React.FC = () => {
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const { data: leaves = [], isLoading } = useQuery({
-    queryKey: ['myLeaves'],
+    queryKey: ['myLeaves', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/leaves');
       return res.data?.data || [];
@@ -39,8 +41,8 @@ export const InternLeavesPage: React.FC = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myLeaves'] });
-      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['myLeaves', user?.userId] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary', user?.userId] });
       setMsg({ text: 'Leave request submitted successfully for review!', type: 'success' });
       setStartDate('');
       setEndDate('');
@@ -56,8 +58,8 @@ export const InternLeavesPage: React.FC = () => {
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => api.delete(`/intern/leaves/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myLeaves'] });
-      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['myLeaves', user?.userId] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary', user?.userId] });
       setMsg({ text: 'Leave request cancelled successfully.', type: 'success' });
       setTimeout(() => setMsg(null), 4000);
     },
