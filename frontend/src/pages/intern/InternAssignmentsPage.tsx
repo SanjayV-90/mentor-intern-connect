@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { Code2, Plus, ExternalLink, Clock, UploadCloud, Edit2, Trash2, CheckCirc
 
 export const InternAssignmentsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -26,7 +28,7 @@ export const InternAssignmentsPage: React.FC = () => {
   });
 
   const { data: assignments = [], isLoading } = useQuery({
-    queryKey: ['myAssignments'],
+    queryKey: ['myAssignments', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/assignments');
       return res.data.data;
@@ -49,10 +51,10 @@ export const InternAssignmentsPage: React.FC = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myAssignments'] });
+      queryClient.invalidateQueries({ queryKey: ['myAssignments', user?.userId] });
       queryClient.invalidateQueries({ queryKey: ['adminInternAssignments'] });
       queryClient.invalidateQueries({ queryKey: ['adminWorkspaceInterns'] });
-      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary', user?.userId] });
       queryClient.invalidateQueries({ queryKey: ['adminDashboard'] });
       setIsModalOpen(false);
       setFile(null);

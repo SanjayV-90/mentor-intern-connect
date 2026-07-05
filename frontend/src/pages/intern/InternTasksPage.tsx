@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { CheckSquare, Plus, Sliders } from 'lucide-react';
 
 export const InternTasksPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [progressVal, setProgressVal] = useState(0);
@@ -25,7 +27,7 @@ export const InternTasksPage: React.FC = () => {
   });
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['myTasks'],
+    queryKey: ['myTasks', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/tasks');
       return res.data.data;
@@ -35,7 +37,7 @@ export const InternTasksPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: async () => api.post('/intern/tasks', form),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['myTasks', user?.userId] });
       setIsNewModalOpen(false);
       setForm({ taskName: '', category: 'Backend', priority: 'HIGH', estimatedHours: 4, notes: '' });
     },
@@ -49,7 +51,7 @@ export const InternTasksPage: React.FC = () => {
         actualHours: actualHoursVal,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['myTasks', user?.userId] });
       setSelectedTask(null);
     },
   });

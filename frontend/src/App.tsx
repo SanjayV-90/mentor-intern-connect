@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/context/AuthContext';
 import { MainLayout } from '@/components/layout/MainLayout';
 
@@ -23,15 +24,6 @@ import { InternAssignmentsPage } from '@/pages/intern/InternAssignmentsPage';
 import { InternTasksPage } from '@/pages/intern/InternTasksPage';
 import { InternDuolingoPage } from '@/pages/intern/InternDuolingoPage';
 import { InternLeavesPage } from '@/pages/intern/InternLeavesPage';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
 
 export function App() {
   return (

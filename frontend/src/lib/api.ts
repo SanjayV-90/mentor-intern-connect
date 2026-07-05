@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getSessionToken, setSessionToken, getRefreshToken } from '@/context/AuthContext';
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -7,9 +8,15 @@ const api = axios.create({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Request interceptor — reads the token from sessionStorage on every request
+// so that each tab always attaches its own session's JWT.
+// IMPORTANT: Do NOT capture the token once at module init. Re-read it on every
+// request so that token refresh (below) is immediately picked up.
+// ---------------------------------------------------------------------------
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token = getSessionToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -21,27 +28,38 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ---------------------------------------------------------------------------
+// Response interceptor — handles 401 (expired access token) by trying the
+// refresh-token flow. Reads and writes from sessionStorage to stay tab-local.
+// On irrecoverable failure: clears only this tab's session state.
+// ---------------------------------------------------------------------------
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/login')
+    ) {
       originalRequest._retry = true;
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
+        const refreshToken = getRefreshToken();
         if (!refreshToken) {
           throw new Error('No refresh token available');
         }
         const res = await axios.post('/api/v1/auth/refresh-token', { refreshToken });
         if (res.data?.data?.accessToken) {
-          localStorage.setItem('accessToken', res.data.data.accessToken);
+          // Update only this tab's sessionStorage — other tabs are unaffected.
+          setSessionToken(res.data.data.accessToken);
           originalRequest.headers.Authorization = `Bearer ${res.data.data.accessToken}`;
           return api(originalRequest);
         }
       } catch (refreshErr) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        // Clear only this tab's session. Other tabs remain authenticated.
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('user');
         window.location.href = '/login';
         return Promise.reject(refreshErr);
       }

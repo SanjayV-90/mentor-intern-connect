@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,12 +9,13 @@ import { CalendarCheck, LogIn, LogOut, CheckCircle2, AlertCircle } from 'lucide-
 
 export const InternAttendancePage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [status, setStatus] = useState<'PRESENT' | 'HALF_DAY'>('PRESENT');
   const [remarks, setRemarks] = useState('');
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const { data: attendanceHistory = [], isLoading } = useQuery({
-    queryKey: ['myAttendance'],
+    queryKey: ['myAttendance', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/attendance');
       return res.data.data;
@@ -21,7 +23,7 @@ export const InternAttendancePage: React.FC = () => {
   });
 
   const { data: summary } = useQuery({
-    queryKey: ['myAttendanceSummary'],
+    queryKey: ['myAttendanceSummary', user?.userId],
     queryFn: async () => {
       const res = await api.get('/intern/attendance/summary');
       return res.data?.data || null;
@@ -32,8 +34,8 @@ export const InternAttendancePage: React.FC = () => {
   const checkInMutation = useMutation({
     mutationFn: async () => api.post('/intern/attendance/check-in', { status, remarks }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myAttendance'] });
-      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendance', user?.userId] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary', user?.userId] });
       setMsg({ text: 'Daily attendance checked in successfully!', type: 'success' });
       setRemarks('');
     },
@@ -45,8 +47,8 @@ export const InternAttendancePage: React.FC = () => {
   const checkOutMutation = useMutation({
     mutationFn: async () => api.post('/intern/attendance/check-out'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myAttendance'] });
-      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendance', user?.userId] });
+      queryClient.invalidateQueries({ queryKey: ['myAttendanceSummary', user?.userId] });
       setMsg({ text: 'Daily attendance checked out successfully!', type: 'success' });
     },
     onError: (err: any) => {

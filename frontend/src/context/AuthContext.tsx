@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
+import { queryClient } from '@/lib/queryClient';
 
 export interface UserSession {
   userId: string;
@@ -19,32 +20,95 @@ interface AuthContextType {
   isAuthenticated: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Storage helpers — all auth state lives in sessionStorage so each browser
+// tab maintains its own independent session. Two tabs logged in as different
+// roles (ADMIN / INTERN) cannot overwrite each other's tokens.
+// ---------------------------------------------------------------------------
+
+const KEYS = {
+  accessToken: 'accessToken',
+  refreshToken: 'refreshToken',
+  user: 'user',
+} as const;
+
+function readSession(): UserSession | null {
+  try {
+    const raw = sessionStorage.getItem(KEYS.user);
+    return raw ? (JSON.parse(raw) as UserSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(session: UserSession): void {
+  if (session.accessToken) {
+    sessionStorage.setItem(KEYS.accessToken, session.accessToken);
+  }
+  if (session.refreshToken) {
+    sessionStorage.setItem(KEYS.refreshToken, session.refreshToken);
+  }
+  sessionStorage.setItem(KEYS.user, JSON.stringify(session));
+}
+
+function clearSession(): void {
+  sessionStorage.removeItem(KEYS.accessToken);
+  sessionStorage.removeItem(KEYS.refreshToken);
+  sessionStorage.removeItem(KEYS.user);
+  // Remove legacy localStorage entries written by the old implementation.
+  // This ensures the old token can never leak into the Axios interceptor.
+  localStorage.removeItem(KEYS.accessToken);
+  localStorage.removeItem(KEYS.refreshToken);
+  localStorage.removeItem(KEYS.user);
+}
+
+// ---------------------------------------------------------------------------
+// Exported token helpers used by api.ts (avoids circular imports).
+// api.ts must NOT read from localStorage at all.
+// ---------------------------------------------------------------------------
+
+export function getSessionToken(): string | null {
+  return sessionStorage.getItem(KEYS.accessToken);
+}
+
+export function setSessionToken(token: string): void {
+  sessionStorage.setItem(KEYS.accessToken, token);
+}
+
+export function getRefreshToken(): string | null {
+  return sessionStorage.getItem(KEYS.refreshToken);
+}
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserSession | null>(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  // Hydrate from sessionStorage — each tab gets its own independent session.
+  const [user, setUser] = useState<UserSession | null>(() => readSession());
 
-  const loginSession = (sessionData: UserSession) => {
-    if (sessionData.accessToken) localStorage.setItem('accessToken', sessionData.accessToken);
-    if (sessionData.refreshToken) localStorage.setItem('refreshToken', sessionData.refreshToken);
-    localStorage.setItem('user', JSON.stringify(sessionData));
+  const loginSession = (sessionData: UserSession): void => {
+    // Clear any stale TanStack Query cache that belongs to the previous user
+    // before committing the new session. This prevents data from one account
+    // appearing momentarily for another account within the same tab.
+    queryClient.clear();
+    writeSession(sessionData);
     setUser(sessionData);
   };
 
-  const updateUserSession = (data: Partial<UserSession>) => {
+  const updateUserSession = (data: Partial<UserSession>): void => {
     if (!user) return;
-    const updated = { ...user, ...data };
-    localStorage.setItem('user', JSON.stringify(updated));
+    const updated: UserSession = { ...user, ...data };
+    writeSession(updated);
     setUser(updated);
   };
 
-  const logout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+  const logout = (): void => {
+    // Clear all cached query data for this tab before destroying the session.
+    queryClient.clear();
+    clearSession();
     setUser(null);
   };
 

@@ -20,7 +20,7 @@ export const Navbar: React.FC = () => {
   const queryClient = useQueryClient();
 
   const { data: notifications = [] } = useQuery<NotificationItem[]>({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', user?.userId],
     queryFn: async () => {
       const res = await api.get('/notifications');
       return res.data.data || [];
@@ -32,14 +32,14 @@ export const Navbar: React.FC = () => {
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => api.patch(`/notifications/${id}/read`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.userId] });
     },
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => api.patch('/notifications/read-all'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.userId] });
     },
   });
 
