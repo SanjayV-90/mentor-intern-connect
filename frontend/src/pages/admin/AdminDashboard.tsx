@@ -52,21 +52,16 @@ type ModuleTab =
   | 'leaves'
   | 'coding'
   | 'tasks'
-  | 'assignments'
   | 'duolingo'
   | 'communication'
   | 'projects'
-  | 'ai_insights'
   | 'timeline';
-
-type PlatformTab = 'LEETCODE' | 'HACKERRANK' | 'GFG' | 'CODECHEF';
 
 export const AdminDashboard: React.FC = () => {
   const { selectedIntern, setSelectedIntern } = useAdminWorkspace();
   const queryClient = useQueryClient();
 
-  const [activeModule, setActiveModule] = useState<ModuleTab>('ai_insights');
-  const [activePlatform, setActivePlatform] = useState<PlatformTab>('LEETCODE');
+  const [activeModule, setActiveModule] = useState<ModuleTab>('attendance');
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null);
 
   const [workHoursInput, setWorkHoursInput] = useState<string>('8.0');
@@ -75,6 +70,8 @@ export const AdminDashboard: React.FC = () => {
   // Assignment Filters State
   const [assignDateRange, setAssignDateRange] = useState<string>('All');
   const [assignTechStack, setAssignTechStack] = useState<string>('All');
+  const [assignPlatform, setAssignPlatform] = useState<string>('All');
+  const [assignDifficulty, setAssignDifficulty] = useState<string>('All');
   const [assignStatus, setAssignStatus] = useState<string>('All');
   const [assignSearch, setAssignSearch] = useState<string>('');
 
@@ -134,19 +131,22 @@ export const AdminDashboard: React.FC = () => {
     }
   }, [attendanceSummary, selectedIntern]);
 
-  const { data: rawAssignments = [] } = useQuery({
+  const { data: rawAssignments = [], isLoading: assignLoading, isError: assignError, refetch: refetchAssignments } = useQuery({
     queryKey: ['adminInternAssignments', selectedIntern?.userId],
     queryFn: async () => {
       if (!selectedIntern?.userId) return [];
       try {
         const res = await api.get(`/admin/interns/${selectedIntern.userId}/assignments`);
         return Array.isArray(res?.data?.data) ? res.data.data : [];
-      } catch {
-        return [];
+      } catch (err) {
+        // Re-throw so TanStack Query sets isError=true (genuine failure).
+        // An empty assignment list is a 200 OK with data:[], not an error.
+        throw err;
       }
     },
     enabled: !!selectedIntern?.userId,
     refetchInterval: 15000,
+    retry: 1,
   });
 
   const { data: rawTasks = [] } = useQuery({
@@ -233,6 +233,7 @@ export const AdminDashboard: React.FC = () => {
     mutationFn: async (id: string) => api.patch(`/admin/assignments/${id}/approve`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminAssignmentsAll'] });
+      queryClient.invalidateQueries({ queryKey: ['adminInternAssignments', selectedIntern?.userId] });
       setFeedbackSuccess('Assignment submission approved!');
       setTimeout(() => setFeedbackSuccess(null), 3000);
     },
@@ -242,6 +243,7 @@ export const AdminDashboard: React.FC = () => {
     mutationFn: async (id: string) => api.patch(`/admin/assignments/${id}/reject`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminAssignmentsAll'] });
+      queryClient.invalidateQueries({ queryKey: ['adminInternAssignments', selectedIntern?.userId] });
       setFeedbackSuccess('Assignment submission rejected.');
       setTimeout(() => setFeedbackSuccess(null), 3000);
     },
@@ -370,12 +372,10 @@ export const AdminDashboard: React.FC = () => {
       {/* ========================================== */}
       <div className="flex items-center space-x-1.5 overflow-x-auto rounded-2xl bg-slate-900/80 p-1.5 border border-slate-800/80 backdrop-blur-xl">
         {[
-          { id: 'ai_insights', label: 'AI Performance Insights', icon: Sparkles },
           { id: 'attendance', label: 'Attendance', icon: UserCheck },
           { id: 'leaves', label: 'Leave Requests & Policy', icon: CalendarDays },
-          { id: 'coding', label: 'Coding Performance', icon: Code },
+          { id: 'coding', label: 'Coding & Submissions', icon: Code },
           { id: 'tasks', label: 'Daily Tasks', icon: CheckSquare },
-          { id: 'assignments', label: 'Assignment Submission', icon: FileText },
           { id: 'duolingo', label: 'Duolingo', icon: Flame },
           { id: 'communication', label: 'Communication', icon: MessageSquare },
           { id: 'projects', label: 'Projects', icon: GitPullRequest },
@@ -406,111 +406,6 @@ export const AdminDashboard: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
         {/* CENTER MODULE AREA (Span 3) */}
         <div className="xl:col-span-3 space-y-6">
-          
-          {/* MODULE 8: AI PERFORMANCE INSIGHTS */}
-          {activeModule === 'ai_insights' && (
-            !hasActivity ? (
-              <Card className="glass-card p-12 text-center text-slate-400">
-                <Sparkles className="mx-auto mb-3 h-10 w-10 text-blue-500 opacity-60" />
-                <h3 className="text-base font-bold text-white">No activity available yet.</h3>
-                <p className="text-xs text-slate-400 mt-1">AI Performance Insights will generate automatically once the intern records attendance or submits assignments.</p>
-              </Card>
-            ) : (
-            <div className="space-y-6 animate-fade-in">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="glass-card border-blue-500/30 bg-gradient-to-br from-blue-900/20 to-slate-900">
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs uppercase font-extrabold text-blue-400">Consistency Score</span>
-                      <h3 className="text-3xl font-black text-white mt-1">96 / 100</h3>
-                    </div>
-                    <Award className="h-10 w-10 text-blue-400 opacity-80" />
-                  </CardContent>
-                </Card>
-                <Card className="glass-card border-emerald-500/30 bg-gradient-to-br from-emerald-900/20 to-slate-900">
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs uppercase font-extrabold text-emerald-400">Learning Velocity</span>
-                      <h3 className="text-3xl font-black text-white mt-1">High (+14%)</h3>
-                    </div>
-                    <TrendingUp className="h-10 w-10 text-emerald-400 opacity-80" />
-                  </CardContent>
-                </Card>
-                <Card className="glass-card border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-slate-900">
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs uppercase font-extrabold text-purple-400">Retention Risk</span>
-                      <h3 className="text-3xl font-black text-emerald-400 mt-1">Low Risk</h3>
-                    </div>
-                    <ShieldCheck className="h-10 w-10 text-purple-400 opacity-80" />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="glass-card border-slate-800">
-                  <CardHeader>
-                    <CardTitle className="text-base font-bold text-emerald-400 flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5" /> Demonstrated Strengths
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-emerald-300">
-                      <strong>Algorithmic Mastery:</strong> Solved complex LRU Cache & Graph traversal problems with optimal $O(1)$ time complexity.
-                    </div>
-                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-emerald-300">
-                      <strong>Batch Punctuality:</strong> Zero unexcused absences during Sprint 1 and Sprint 2 check-ins.
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="glass-card border-slate-800">
-                  <CardHeader>
-                    <CardTitle className="text-base font-bold text-amber-400 flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" /> Growth & Improvement Areas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-amber-300">
-                      <strong>Unit Test Coverage:</strong> Needs stronger JUnit 5 assertion coverage on edge cases in Spring service layers.
-                    </div>
-                    <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-amber-300">
-                      <strong>SQL Optimization:</strong> Practice advanced indexing strategies for partitioned PostgreSQL tables.
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="glass-card border-blue-500/30">
-                <CardHeader>
-                  <CardTitle className="text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-blue-400" /> AI Recommended Next Tasks & Sprint Prediction
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                    <span className="text-xs font-bold uppercase text-blue-400 block">Suggested Problems</span>
-                    <ul className="list-disc list-inside text-slate-300 space-y-1">
-                      <li>LeetCode #23: Merge k Sorted Lists (Hard)</li>
-                      <li>HackerRank: Advanced SQL Window Partitions</li>
-                      <li>Spring Security 6 Stateless OAuth2 Resource Server</li>
-                    </ul>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                    <span className="text-xs font-bold uppercase text-emerald-400 block">Predicted Sprint Outcome</span>
-                    <p className="text-slate-300 font-semibold text-base">
-                      Exceeds Expectations (Projected Rating: 4.8 / 5.0)
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Based on current learning velocity and zero task blockers logged this week.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            )
-          )}
-
           {/* MODULE 1: ATTENDANCE */}
           {activeModule === 'attendance' && (() => {
             const workingDays = attendanceSummary?.totalWorkingDays ?? internAttendance.length;
@@ -784,19 +679,70 @@ export const AdminDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* MODULE 2: CODING PERFORMANCE */}
+          {/* MODULE 2: CODING & SUBMISSIONS */}
           {activeModule === 'coding' && (() => {
+            if (assignLoading) {
+              return (
+                <Card className="glass-card p-12 text-center text-slate-400">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3" />
+                  <p className="text-xs text-slate-400">Loading coding submissions...</p>
+                </Card>
+              );
+            }
+
+            if (assignError) {
+              return (
+                <Card className="glass-card p-12 text-center border-rose-500/30">
+                  <AlertCircle className="mx-auto mb-3 h-10 w-10 text-rose-500 opacity-80" />
+                  <h3 className="text-base font-bold text-white">Failed to load coding submissions</h3>
+                  <p className="text-xs text-rose-400 mt-1 mb-4">A network or server error occurred while retrieving data.</p>
+                  <Button onClick={() => refetchAssignments()} variant="outline" size="sm" className="border-rose-500/50 text-rose-300 hover:bg-rose-500/10">
+                    Retry Fetch
+                  </Button>
+                </Card>
+              );
+            }
+
             const solved = internAssignments;
             const totalProblems = solved.length;
-            const easyCount = solved.filter((a: any) => a.difficulty?.toUpperCase() === 'EASY').length;
-            const mediumCount = solved.filter((a: any) => a.difficulty?.toUpperCase() === 'MEDIUM').length;
-            const hardCount = solved.filter((a: any) => a.difficulty?.toUpperCase() === 'HARD').length;
-            const acceptanceRate = totalProblems > 0 ? 100 : 0;
+            const easyCount = solved.filter((a: any) => (a.difficulty || '').toUpperCase() === 'EASY').length;
+            const mediumCount = solved.filter((a: any) => (a.difficulty || '').toUpperCase() === 'MEDIUM').length;
+            const hardCount = solved.filter((a: any) => (a.difficulty || '').toUpperCase() === 'HARD').length;
+            const totalTimeSpent = solved.reduce((acc: number, a: any) => acc + (Number(a.timeTakenMinutes) || 0), 0);
+            const avgTime = totalProblems > 0 ? Math.round(totalTimeSpent / totalProblems) : 0;
+            const platformsUsed = Array.from(new Set(solved.map((a: any) => a.platform || 'UNKNOWN'))).filter(Boolean).length;
+
+            let currentStreak = 0;
+            if (totalProblems > 0) {
+              const dates = Array.from(new Set(solved.map((a: any) => a.submissionDate).filter(Boolean))).sort().reverse();
+              if (dates.length > 0) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const yestDate = new Date();
+                yestDate.setDate(yestDate.getDate() - 1);
+                const yestStr = yestDate.toISOString().split('T')[0];
+                
+                if (dates[0] === todayStr || dates[0] === yestStr) {
+                  currentStreak = 1;
+                  let curr = new Date(dates[0] as string);
+                  for (let i = 1; i < dates.length; i++) {
+                    const prev = new Date(curr);
+                    prev.setDate(prev.getDate() - 1);
+                    const prevStr = prev.toISOString().split('T')[0];
+                    if (dates[i] === prevStr) {
+                      currentStreak++;
+                      curr = prev;
+                    } else {
+                      break;
+                    }
+                  }
+                }
+              }
+            }
 
             const now = new Date();
             const weeklyData = [1, 2, 3, 4].map((w) => {
               const count = solved.filter((a: any) => {
-                if (!a.submissionDate) return w === 4;
+                if (!a.submissionDate) return false;
                 const subDate = new Date(a.submissionDate);
                 const diffDays = Math.floor((now.getTime() - subDate.getTime()) / (1000 * 3600 * 24));
                 const weekNum = Math.floor(diffDays / 7) + 1;
@@ -805,38 +751,69 @@ export const AdminDashboard: React.FC = () => {
               return { week: `Wk ${w}`, solved: count };
             }).reverse();
 
+            const filtered = solved.filter((a: any) => {
+              if (assignTechStack !== 'All' && (a.techStack || '').toUpperCase() !== assignTechStack.toUpperCase()) return false;
+              if (assignPlatform !== 'All' && (a.platform || '').toUpperCase() !== assignPlatform.toUpperCase()) return false;
+              if (assignDifficulty !== 'All' && (a.difficulty || 'MEDIUM').toUpperCase() !== assignDifficulty.toUpperCase()) return false;
+              if (assignStatus !== 'All') {
+                const normStatus = (a.status === 'SOLVED' || a.status === 'APPROVED') ? 'Approved' : (a.status === 'PENDING' || a.status === 'PENDING_REVIEW') ? 'Pending Review' : 'Rejected';
+                if (normStatus !== assignStatus) return false;
+              }
+              if (assignSearch) {
+                const q = assignSearch.toLowerCase();
+                const matchTitle = (a.title || '').toLowerCase().includes(q);
+                const matchRepo = (a.problemUrl || '').toLowerCase().includes(q);
+                if (!matchTitle && !matchRepo) return false;
+              }
+              if (assignDateRange !== 'All' && a.submissionDate) {
+                const subDate = new Date(a.submissionDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (assignDateRange === 'Today') {
+                  if (subDate.toDateString() !== today.toDateString()) return false;
+                } else if (assignDateRange === 'Yesterday') {
+                  const yest = new Date(today);
+                  yest.setDate(yest.getDate() - 1);
+                  if (subDate.toDateString() !== yest.toDateString()) return false;
+                } else if (assignDateRange === 'Last 7 Days') {
+                  const diff = (today.getTime() - subDate.getTime()) / (1000 * 3600 * 24);
+                  if (diff < 0 || diff > 7) return false;
+                } else if (assignDateRange === 'Last 30 Days') {
+                  const diff = (today.getTime() - subDate.getTime()) / (1000 * 3600 * 24);
+                  if (diff < 0 || diff > 30) return false;
+                }
+              }
+              return true;
+            });
+
+            const filteredTimeSpent = filtered.reduce((acc: number, a: any) => acc + (Number(a.timeTakenMinutes) || 0), 0);
+            const filteredAvgTime = filtered.length > 0 ? Math.round(filteredTimeSpent / filtered.length) : 0;
+
             return (
               <div className="space-y-6 animate-fade-in">
-                {/* Platform sub-tabs */}
-                <div className="flex space-x-2 border-b border-slate-800 pb-3">
-                  {(['LEETCODE', 'HACKERRANK', 'GFG', 'CODECHEF'] as PlatformTab[]).map((plat) => (
-                    <button
-                      key={plat}
-                      onClick={() => setActivePlatform(plat)}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                        activePlatform === plat
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'bg-slate-900 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {plat}
-                    </button>
-                  ))}
+                {/* SECTION A — CODING KPI SUMMARY (Overall Lifetime Metrics) */}
+                <div>
+                  <h3 className="text-xs font-bold uppercase text-slate-400 mb-3 flex items-center gap-2">
+                    <Code className="h-4 w-4 text-purple-400" /> Overall Lifetime Coding KPI Summary
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-slate-400 block font-bold">Total Solved</span><strong className="text-xl text-white">{totalProblems}</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-emerald-400 block font-bold">Easy</span><strong className="text-xl text-emerald-400">{easyCount}</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-amber-400 block font-bold">Medium</span><strong className="text-xl text-amber-400">{mediumCount}</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-rose-400 block font-bold">Hard</span><strong className="text-xl text-rose-400">{hardCount}</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-blue-400 block font-bold">Total Time</span><strong className="text-xl text-blue-400">{totalTimeSpent}m</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-purple-400 block font-bold">Avg Time</span><strong className="text-xl text-purple-400">{avgTime}m</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-orange-400 block font-bold">Streak</span><strong className="text-xl text-orange-400">{currentStreak}d</strong></Card>
+                    <Card className="glass-card text-center p-3"><span className="text-[10px] text-teal-400 block font-bold">Platforms</span><strong className="text-xl text-teal-400">{platformsUsed}</strong></Card>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <Card className="glass-card text-center p-4"><span className="text-xs text-slate-400 block">Total Problems</span><strong className="text-2xl text-white">{totalProblems}</strong></Card>
-                  <Card className="glass-card text-center p-4"><span className="text-xs text-emerald-400 block">Easy</span><strong className="text-2xl text-emerald-400">{easyCount}</strong></Card>
-                  <Card className="glass-card text-center p-4"><span className="text-xs text-amber-400 block">Medium</span><strong className="text-2xl text-amber-400">{mediumCount}</strong></Card>
-                  <Card className="glass-card text-center p-4"><span className="text-xs text-rose-400 block">Hard</span><strong className="text-2xl text-rose-400">{hardCount}</strong></Card>
-                  <Card className="glass-card text-center p-4 col-span-2 sm:col-span-1"><span className="text-xs text-blue-400 block">Acceptance Rate</span><strong className="text-2xl text-blue-400">{acceptanceRate}%</strong></Card>
-                </div>
-
+                {/* SECTION B — CODING ACTIVITY TREND */}
                 <Card className="glass-card">
-                  <CardHeader><CardTitle className="text-base font-bold">Weekly Algorithmic Activity</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-base font-bold">Weekly Algorithmic Activity Trend</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
                     {totalProblems === 0 ? (
-                      <div className="h-48 flex items-center justify-center text-xs text-slate-500 italic">
+                      <div className="h-40 flex items-center justify-center text-xs text-slate-500 italic">
                         No activity available yet.
                       </div>
                     ) : (
@@ -852,6 +829,213 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     )}
                   </CardContent>
+                </Card>
+
+                {/* SECTION D — FILTERS */}
+                <Card className="glass-card p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                    {/* Filter 1: Date Range */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
+                      <select
+                        value={assignDateRange}
+                        onChange={(e) => setAssignDateRange(e.target.value)}
+                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
+                      >
+                        <option value="All">All Dates</option>
+                        <option value="Today">Today</option>
+                        <option value="Yesterday">Yesterday</option>
+                        <option value="Last 7 Days">Last 7 Days</option>
+                        <option value="Last 30 Days">Last 30 Days</option>
+                      </select>
+                    </div>
+
+                    {/* Filter 2: Technology / Tech Stack */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tech Stack</label>
+                      <select
+                        value={assignTechStack}
+                        onChange={(e) => setAssignTechStack(e.target.value)}
+                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
+                      >
+                        <option value="All">All Tech Stacks</option>
+                        <option value="JAVA">Java</option>
+                        <option value="PYTHON">Python</option>
+                        <option value="SQL">SQL</option>
+                        <option value="SPRING_BOOT">Spring Boot</option>
+                        <option value="REACT">React</option>
+                        <option value="DATA_ENGINEERING">Data Engineering</option>
+                        <option value="SPARK">Spark</option>
+                        <option value="DSA">DSA</option>
+                      </select>
+                    </div>
+
+                    {/* Filter 3: Platform */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Platform</label>
+                      <select
+                        value={assignPlatform}
+                        onChange={(e) => setAssignPlatform(e.target.value)}
+                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
+                      >
+                        <option value="All">All Platforms</option>
+                        <option value="LEETCODE">LeetCode</option>
+                        <option value="HACKERRANK">HackerRank</option>
+                        <option value="CODECHEF">CodeChef</option>
+                        <option value="GEEKSFORGEEKS">GeeksForGeeks</option>
+                        <option value="CODEFORCES">Codeforces</option>
+                        <option value="CUSTOM">Custom</option>
+                      </select>
+                    </div>
+
+                    {/* Filter 4: Difficulty */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Difficulty</label>
+                      <select
+                        value={assignDifficulty}
+                        onChange={(e) => setAssignDifficulty(e.target.value)}
+                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
+                      >
+                        <option value="All">All Difficulties</option>
+                        <option value="EASY">Easy</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HARD">Hard</option>
+                      </select>
+                    </div>
+
+                    {/* Filter 5: Status */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Status</label>
+                      <select
+                        value={assignStatus}
+                        onChange={(e) => setAssignStatus(e.target.value)}
+                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
+                      >
+                        <option value="All">All Statuses</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Pending Review">Pending Review</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+
+                    {/* Filter 6: Search Assignment */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Search</label>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+                        <Input
+                          value={assignSearch}
+                          onChange={(e) => setAssignSearch(e.target.value)}
+                          placeholder="Search title or repo..."
+                          className="pl-8 h-8.5 text-xs bg-slate-900 border-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* SECTION C — SUBMISSION HISTORY */}
+                <Card className="glass-card overflow-hidden">
+                  <div className="p-4 border-b border-slate-800/60 bg-slate-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-400" /> Persisted Submission History
+                    </h4>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-slate-300">
+                        Showing <strong className="text-white">{filtered.length}</strong> of <strong className="text-white">{totalProblems}</strong> Submissions
+                      </span>
+                      {filtered.length > 0 && (
+                        <span className="text-slate-400 border-l border-slate-800 pl-4">
+                          Filtered Time: <strong className="text-blue-400">{filteredTimeSpent}m</strong> (Avg: <strong className="text-purple-400">{filteredAvgTime}m</strong>)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 uppercase tracking-wider font-bold text-[10px]">
+                          <th className="p-3">Problem Title</th>
+                          <th className="p-3">Platform</th>
+                          <th className="p-3">Tech Stack</th>
+                          <th className="p-3">Difficulty</th>
+                          <th className="p-3">Time Taken</th>
+                          <th className="p-3">Submission Date</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Problem URL</th>
+                          <th className="p-3">Evidence</th>
+                          <th className="p-3">Solution Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {totalProblems === 0 ? (
+                          <tr>
+                            <td colSpan={10} className="p-12 text-center text-slate-400">
+                              <Code className="mx-auto mb-3 h-10 w-10 text-slate-500 opacity-60" />
+                              <h3 className="text-base font-bold text-white">No coding submissions recorded yet.</h3>
+                              <p className="text-xs text-slate-400 mt-1">Once the intern records solved problems, their metrics and history will appear here.</p>
+                            </td>
+                          </tr>
+                        ) : filtered.length === 0 ? (
+                          <tr>
+                            <td colSpan={10} className="p-8 text-center text-slate-500 italic">
+                              No submissions match the selected filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          filtered.map((a: any) => {
+                            const isPending = a.status === 'PENDING' || a.status === 'PENDING_REVIEW';
+                            const statusStr = (a.status === 'SOLVED' || a.status === 'APPROVED') ? 'Approved' : isPending ? 'Pending Review' : 'Rejected';
+                            return (
+                              <tr key={a.id} className="hover:bg-slate-900/40 transition-colors">
+                                <td className="p-3 font-bold text-white">{a.title}</td>
+                                <td className="p-3"><Badge variant="outline" className="font-mono text-[10px] border-purple-500/30 text-purple-300">{a.platform || 'N/A'}</Badge></td>
+                                <td className="p-3"><Badge variant="purple" className="font-mono text-[10px]">{a.techStack || 'N/A'}</Badge></td>
+                                <td className="p-3"><Badge variant={a.difficulty?.toUpperCase() === 'HARD' ? 'destructive' : a.difficulty?.toUpperCase() === 'MEDIUM' ? 'warning' : 'success'}>{a.difficulty || 'Medium'}</Badge></td>
+                                <td className="p-3 font-mono text-slate-300">{a.timeTakenMinutes || 0} mins</td>
+                                <td className="p-3 font-mono text-slate-300">{a.submissionDate || 'Today'}</td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={statusStr === 'Approved' ? 'success' : isPending ? 'warning' : 'destructive'}>{statusStr}</Badge>
+                                    {isPending && (
+                                      <div className="flex gap-1">
+                                        <button onClick={() => approveAssignmentMutation.mutate(a.id)} className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px]">Approve</button>
+                                        <button onClick={() => rejectAssignmentMutation.mutate(a.id)} className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px]">Reject</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  {a.problemUrl ? (
+                                    <a href={a.problemUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:text-blue-300">
+                                      <Globe className="h-3 w-3" /> Link
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-500">N/A</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  {a.screenshotUrls && a.screenshotUrls.length > 0 ? (
+                                    <button
+                                      onClick={() => openSecureFile(a.screenshotUrls[0])}
+                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
+                                    >
+                                      <FileText className="h-3 w-3" /> Evidence
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-500 text-[11px]">No Evidence</span>
+                                  )}
+                                </td>
+                                <td className="p-3 text-slate-300 italic max-w-xs truncate" title={a.notes || 'No notes provided.'}>
+                                  "{a.notes || 'No notes provided.'}"
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </Card>
               </div>
             );
@@ -899,169 +1083,6 @@ export const AdminDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
-            );
-          })()}
-
-          {/* MODULE 4: ASSIGNMENT SUBMISSION */}
-          {activeModule === 'assignments' && (() => {
-            const baseList = internAssignments;
-
-            const filtered = baseList.filter((a: any) => {
-              if (assignTechStack !== 'All' && a.techStack !== assignTechStack) return false;
-              if (assignStatus !== 'All') {
-                const normStatus = (a.status === 'SOLVED' || a.status === 'APPROVED') ? 'Approved' : (a.status === 'PENDING' || a.status === 'PENDING_REVIEW') ? 'Pending Review' : 'Rejected';
-                if (normStatus !== assignStatus) return false;
-              }
-              if (assignSearch) {
-                const q = assignSearch.toLowerCase();
-                const matchTitle = (a.title || '').toLowerCase().includes(q);
-                const matchRepo = (a.problemUrl || '').toLowerCase().includes(q);
-                if (!matchTitle && !matchRepo) return false;
-              }
-              return true;
-            });
-
-            return (
-              <div className="space-y-4 animate-fade-in">
-                {/* Filters Bar */}
-                <Card className="glass-card p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* Filter 1: Date Range */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Date Range</label>
-                      <select
-                        value={assignDateRange}
-                        onChange={(e) => setAssignDateRange(e.target.value)}
-                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
-                      >
-                        <option value="All">All Dates</option>
-                        <option value="Today">Today</option>
-                        <option value="Yesterday">Yesterday</option>
-                        <option value="Last 7 Days">Last 7 Days</option>
-                        <option value="Last 30 Days">Last 30 Days</option>
-                        <option value="Custom Date Range">Custom Date Range</option>
-                      </select>
-                    </div>
-
-                    {/* Filter 2: Technology / Tech Stack */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Technology</label>
-                      <select
-                        value={assignTechStack}
-                        onChange={(e) => setAssignTechStack(e.target.value)}
-                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
-                      >
-                        <option value="All">All Tech Stacks</option>
-                        <option value="Java">Java</option>
-                        <option value="Python">Python</option>
-                        <option value="SQL">SQL</option>
-                        <option value="Spring Boot">Spring Boot</option>
-                        <option value="React">React</option>
-                        <option value="Power BI">Power BI</option>
-                        <option value="Data Engineering">Data Engineering</option>
-                        <option value="Machine Learning">Machine Learning</option>
-                      </select>
-                    </div>
-
-                    {/* Filter 3: Submission Status */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Submission Status</label>
-                      <select
-                        value={assignStatus}
-                        onChange={(e) => setAssignStatus(e.target.value)}
-                        className="w-full rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white font-medium focus:border-blue-500"
-                      >
-                        <option value="All">All Statuses</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Pending Review">Pending Review</option>
-                        <option value="Rejected">Rejected</option>
-                      </select>
-                    </div>
-
-                    {/* Filter 4: Search Assignment */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Search Assignment</label>
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
-                        <Input
-                          value={assignSearch}
-                          onChange={(e) => setAssignSearch(e.target.value)}
-                          placeholder="Search title or repo..."
-                          className="pl-8 h-8.5 text-xs bg-slate-900 border-slate-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Assignment Table */}
-                <Card className="glass-card overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 uppercase tracking-wider font-bold text-[10px]">
-                          <th className="p-3">Assignment Name</th>
-                          <th className="p-3">Technology</th>
-                          <th className="p-3">Submission Date</th>
-                          <th className="p-3">Repository Link</th>
-                          <th className="p-3">Difficulty</th>
-                          <th className="p-3">Marks</th>
-                          <th className="p-3">Review Status</th>
-                          <th className="p-3">Time Taken</th>
-                          <th className="p-3">Manager Feedback</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/60">
-                        {filtered.length === 0 ? (
-                          <tr>
-                            <td colSpan={9} className="p-8 text-center text-slate-500 italic">
-                              No activity available yet.
-                            </td>
-                          </tr>
-                        ) : (
-                          filtered.map((a: any) => {
-                            const isPending = a.status === 'PENDING' || a.status === 'PENDING_REVIEW';
-                            const statusStr = (a.status === 'SOLVED' || a.status === 'APPROVED') ? 'Approved' : isPending ? 'Pending Review' : 'Rejected';
-                            return (
-                              <tr key={a.id} className="hover:bg-slate-900/40 transition-colors">
-                                <td className="p-3 font-bold text-white">{a.title}</td>
-                                <td className="p-3"><Badge variant="purple" className="font-mono text-[10px]">{a.techStack}</Badge></td>
-                                <td className="p-3 font-mono text-slate-300">{a.submissionDate || 'Today'}</td>
-                                <td className="p-3">
-                                  {a.problemUrl ? (
-                                    <a href={a.problemUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-400 hover:text-blue-300">
-                                      <Globe className="h-3 w-3" /> GitHub Repo
-                                    </a>
-                                  ) : (
-                                    <span className="text-slate-500">N/A</span>
-                                  )}
-                                </td>
-                                <td className="p-3"><Badge variant={a.difficulty?.toUpperCase() === 'HARD' ? 'destructive' : a.difficulty?.toUpperCase() === 'MEDIUM' ? 'warning' : 'success'}>{a.difficulty || 'Medium'}</Badge></td>
-                                <td className="p-3 font-bold text-emerald-400">95 / 100</td>
-                                <td className="p-3">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant={statusStr === 'Approved' ? 'success' : isPending ? 'warning' : 'destructive'}>{statusStr}</Badge>
-                                    {isPending && (
-                                      <div className="flex gap-1">
-                                        <button onClick={() => approveAssignmentMutation.mutate(a.id)} className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px]">Approve</button>
-                                        <button onClick={() => rejectAssignmentMutation.mutate(a.id)} className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px]">Reject</button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="p-3 font-mono text-slate-300">{a.timeTakenMinutes || 45} mins</td>
-                                <td className="p-3 text-slate-300 italic max-w-xs truncate" title={a.notes || 'Clean implementation.'}>
-                                  "{a.notes || 'Clean implementation without issues.'}"
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              </div>
             );
           })()}
 
