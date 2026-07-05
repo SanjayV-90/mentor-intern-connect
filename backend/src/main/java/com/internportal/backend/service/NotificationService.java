@@ -81,16 +81,19 @@ public class NotificationService {
     }
 
     @Transactional
-    public NotificationResponse markAsRead(UUID notificationId) {
+    public NotificationResponse markAsRead(UUID userId, UUID notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new CustomException("Notification not found", HttpStatus.NOT_FOUND));
+        if (!notification.getRecipient().getId().equals(userId)) {
+            throw new CustomException("You do not have permission to access this notification", HttpStatus.FORBIDDEN);
+        }
         notification.setRead(true);
         return toResponse(notificationRepository.save(notification));
     }
 
     @Transactional
-    public void markAllAsRead(UUID adminId) {
-        List<Notification> unread = notificationRepository.findByRecipientIdAndReadFalseOrderByCreatedAtDesc(adminId);
+    public void markAllAsRead(UUID userId) {
+        List<Notification> unread = notificationRepository.findByRecipientIdAndReadFalseOrderByCreatedAtDesc(userId);
         unread.forEach(n -> n.setRead(true));
         notificationRepository.saveAll(unread);
     }

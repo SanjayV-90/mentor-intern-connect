@@ -17,15 +17,37 @@ interface NotificationItem {
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
+  const notifRef = React.useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const { data: notifications = [] } = useQuery<NotificationItem[]>({
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifs(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowNotifs(false);
+      }
+    };
+    if (showNotifs) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showNotifs]);
+
+  const { data: notifications = [], isLoading: notifsLoading, isError: notifsError } = useQuery<NotificationItem[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await api.get('/notifications');
       return res.data.data || [];
     },
-    enabled: user?.role === 'ADMIN',
+    enabled: !!user,
     refetchInterval: 10000,
   });
 
@@ -69,7 +91,7 @@ export const Navbar: React.FC = () => {
           </Badge>
         )}
 
-        <div className="relative">
+        <div className="relative" ref={notifRef}>
           <button
             onClick={() => setShowNotifs(!showNotifs)}
             className="relative rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition-colors"
@@ -83,11 +105,13 @@ export const Navbar: React.FC = () => {
             )}
           </button>
 
-          {showNotifs && user?.role === 'ADMIN' && (
+          {showNotifs && (
             <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-xl border border-slate-800 bg-slate-900 shadow-2xl z-50 overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-800 p-3.5 bg-slate-950/60">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white">Mentor Notifications</span>
+                  <span className="font-bold text-sm text-white">
+                    {user?.role === 'ADMIN' ? 'Mentor Notifications' : 'Intern Notifications'}
+                  </span>
                   {unreadCount > 0 && (
                     <span className="rounded-full bg-blue-500/20 text-blue-400 px-2 py-0.5 text-[10px] font-bold">
                       {unreadCount} new
@@ -105,15 +129,26 @@ export const Navbar: React.FC = () => {
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60">
-                {notifications.length === 0 ? (
+                {notifsLoading ? (
                   <div className="p-6 text-center text-xs text-slate-400">
-                    No notifications available yet.
+                    Loading notifications...
+                  </div>
+                ) : notifsError ? (
+                  <div className="p-6 text-center text-xs text-rose-400">
+                    Failed to load notifications. Please try again.
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    No notifications yet.
                   </div>
                 ) : (
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      className={`p-3.5 transition-colors flex items-start justify-between gap-3 ${
+                      onClick={() => {
+                        if (!n.read) markReadMutation.mutate(n.id);
+                      }}
+                      className={`p-3.5 transition-colors flex items-start justify-between gap-3 cursor-pointer ${
                         !n.read ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-slate-800/40'
                       }`}
                     >
@@ -131,7 +166,10 @@ export const Navbar: React.FC = () => {
                       </div>
                       {!n.read && (
                         <button
-                          onClick={() => markReadMutation.mutate(n.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markReadMutation.mutate(n.id);
+                          }}
                           title="Mark as read"
                           className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
                         >

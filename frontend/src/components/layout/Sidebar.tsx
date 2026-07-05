@@ -86,6 +86,8 @@ const AdminSidebar: React.FC = () => {
     statusFilter,
     setStatusFilter,
     internsList,
+    isLoading: internsLoading,
+    isError: internsError,
   } = useAdminWorkspace();
   const navigate = useNavigate();
   const location = useLocation();
@@ -108,7 +110,7 @@ const AdminSidebar: React.FC = () => {
           </span>
         </div>
         <Badge variant="outline" className="text-[10px] font-mono border-slate-700 text-slate-400">
-          {internsList.length} total
+          {internsLoading ? '…' : internsError ? 'ERR' : `${internsList.length} total`}
         </Badge>
       </div>
 
@@ -159,9 +161,18 @@ const AdminSidebar: React.FC = () => {
 
       {/* Scrollable Interns List */}
       <div className="flex-1 overflow-y-auto space-y-2 pr-1 -mr-1">
-        {!Array.isArray(filteredInterns) || filteredInterns.length === 0 ? (
+        {internsLoading ? (
+          <div className="py-10 text-center text-xs text-slate-500">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mx-auto mb-2" />
+            Loading interns...
+          </div>
+        ) : internsError ? (
+          <div className="py-10 text-center text-xs text-rose-400 italic px-2">
+            Failed to load intern directory. Check your connection and reload.
+          </div>
+        ) : !Array.isArray(filteredInterns) || filteredInterns.length === 0 ? (
           <div className="py-10 text-center text-xs text-slate-500 italic">
-            No interns match criteria.
+            {internsList.length === 0 ? 'No interns registered yet.' : 'No interns match criteria.'}
           </div>
         ) : (
           filteredInterns.map((intern) => {
